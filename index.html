@@ -80,7 +80,8 @@
             color: #666;
         }
 
-        .form-group input {
+        .form-group input,
+        .form-group select {
             padding: 10px;
             border: 1px solid #ddd;
             border-radius: 4px;
@@ -246,6 +247,19 @@
                 <input type="text" id="symbol" placeholder="e.g. AAPL" style="text-transform: uppercase;">
             </div>
             <div class="form-group">
+                <label for="exchange">Exchange</label>
+                <select id="exchange">
+                    <option value="">None (US/NASDAQ/NYSE)</option>
+                    <option value=".AS">Amsterdam (AMS)</option>
+                    <option value=".EAMS">Euronext Amsterdam (EAMS)</option>
+                    <option value=".L">London (LON)</option>
+                    <option value=".TDG">Tradegate AG (TDG)</option>
+                    <option value=".DE">Germany (Xetra)</option>
+                    <option value=".PA">France (Euronext)</option>
+                    <option value=".SW">Switzerland (SIX)</option>
+                </select>
+            </div>
+            <div class="form-group">
                 <label for="quantity">Quantity</label>
                 <input type="number" id="quantity" placeholder="e.g. 10.5" step="0.01" min="0">
             </div>
@@ -307,6 +321,7 @@
 
         function addStock() {
             const symbol = document.getElementById('symbol').value.toUpperCase().trim();
+            const exchange = document.getElementById('exchange').value;
             const quantity = parseFloat(document.getElementById('quantity').value);
             const purchasePrice = parseFloat(document.getElementById('purchasePrice').value);
 
@@ -319,6 +334,7 @@
             stocks.push({
                 id: Date.now(),
                 symbol,
+                exchange,
                 quantity,
                 purchasePrice,
                 addedDate: new Date().toISOString()
@@ -326,6 +342,7 @@
 
             saveStocks(stocks);
             document.getElementById('symbol').value = '';
+            document.getElementById('exchange').value = '';
             document.getElementById('quantity').value = '';
             document.getElementById('purchasePrice').value = '';
 
@@ -349,15 +366,16 @@
             }, 5000);
         }
 
-        async function fetchStockPrice(symbol) {
+        async function fetchStockPrice(symbol, exchange) {
             const apiKey = getApiKey();
             if (!apiKey) {
                 showError('Please enter your Alpha Vantage API key');
                 return null;
             }
 
+            const fullSymbol = symbol + (exchange || '');
             const cache = getPriceCache();
-            const cacheKey = `${symbol}_${new Date().toDateString()}`;
+            const cacheKey = `${fullSymbol}_${new Date().toDateString()}`;
 
             if (cache[cacheKey]) {
                 return cache[cacheKey];
@@ -365,7 +383,7 @@
 
             try {
                 const response = await fetch(
-                    `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${symbol}&apikey=${apiKey}`
+                    `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${fullSymbol}&apikey=${apiKey}`
                 );
                 const data = await response.json();
 
@@ -384,7 +402,7 @@
                     showError('API rate limit reached. Please wait a minute and refresh.');
                     return null;
                 } else {
-                    showError(`Could not find price for ${symbol}`);
+                    showError(`Could not find price for ${fullSymbol}`);
                     return null;
                 }
             } catch (error) {
@@ -408,12 +426,13 @@
             let totalValue = 0;
 
             for (const stock of stocks) {
-                const priceData = await fetchStockPrice(stock.symbol);
+                const priceData = await fetchStockPrice(stock.symbol, stock.exchange);
+                const displaySymbol = stock.symbol + (stock.exchange || '');
 
                 if (!priceData) {
                     html += `
                         <tr>
-                            <td class="symbol">${stock.symbol}</td>
+                            <td class="symbol">${displaySymbol}</td>
                             <td class="number">${stock.quantity}</td>
                             <td class="number">$${stock.purchasePrice.toFixed(2)}</td>
                             <td colspan="7" class="loading">Loading...</td>
