@@ -425,7 +425,7 @@
         const DEFAULT_RATES = {
             'EUR': 1,
             'USD': 0.86,
-            'GBP': 1.27,
+            'GBP': 1.18,
             'CHF': 0.95
         };
 
@@ -581,10 +581,20 @@
                 const data = await response.json();
 
                 if (data['Global Quote'] && data['Global Quote']['05. price']) {
+                    let price = parseFloat(data['Global Quote']['05. price']);
+                    let change = parseFloat(data['Global Quote']['09. change']);
+                    let changePercent = parseFloat(data['Global Quote']['10. change percent']);
+
+                    // London Stock Exchange returns prices in pence, convert to pounds
+                    if (exchange === '.L') {
+                        price = price / 100;
+                        change = change / 100;
+                    }
+
                     const priceData = {
-                        price: parseFloat(data['Global Quote']['05. price']),
-                        change: parseFloat(data['Global Quote']['09. change']),
-                        changePercent: parseFloat(data['Global Quote']['10. change percent']),
+                        price: price,
+                        change: change,
+                        changePercent: changePercent,
                         timestamp: new Date().toISOString()
                     };
 
