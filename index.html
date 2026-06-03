@@ -583,7 +583,11 @@
                             <td class="symbol">${displaySymbol}</td>
                             <td class="number">${stock.quantity}</td>
                             <td class="number">€${stock.purchasePrice.toFixed(2)}</td>
-                            <td colspan="7" class="loading">Loading...</td>
+                            <td colspan="6" class="loading">Loading...</td>
+                            <td style="text-align: center;">
+                                <button class="edit-btn" onclick="editStock(${stock.id})">Edit</button>
+                                <button class="delete-btn" onclick="deleteStock(${stock.id})">Delete</button>
+                            </td>
                         </tr>
                     `;
                     continue;
