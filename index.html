@@ -143,6 +143,17 @@
             color: #007bff;
         }
 
+        .symbol-link {
+            color: #007bff;
+            text-decoration: none;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        .symbol-link:hover {
+            text-decoration: underline;
+        }
+
         .number {
             font-family: 'Monaco', 'Courier New', monospace;
             text-align: right;
@@ -328,6 +339,18 @@
             return JSON.parse(localStorage.getItem(PRICE_CACHE_KEY) || '{}');
         }
 
+        function getGoogleFinanceUrl(symbol, exchange) {
+            const fullSymbol = symbol + (exchange || '');
+            return `https://www.google.com/finance/quote/${fullSymbol}`;
+        }
+
+        const DEFAULT_RATES = {
+            'EUR': 1,
+            'USD': 0.86,
+            'GBP': 1.27,
+            'CHF': 0.95
+        };
+
         async function getExchangeRate(fromCurrency) {
             if (fromCurrency === 'EUR') return 1;
 
@@ -339,9 +362,15 @@
             }
 
             try {
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 3000);
+
                 const response = await fetch(
-                    `https://api.exchangerate-api.com/v4/latest/${fromCurrency}`
+                    `https://api.exchangerate-api.com/v4/latest/${fromCurrency}`,
+                    { signal: controller.signal }
                 );
+                clearTimeout(timeoutId);
+
                 const data = await response.json();
 
                 if (data.rates && data.rates.EUR) {
@@ -350,9 +379,11 @@
                     savePriceCache(cache);
                     return rate;
                 }
-                return null;
+                // Fallback to default rate
+                return DEFAULT_RATES[fromCurrency] || 1;
             } catch (error) {
-                return null;
+                // Use default rate if API fails
+                return DEFAULT_RATES[fromCurrency] || 1;
             }
         }
 
@@ -511,9 +542,10 @@
                 const gainLoss = currentValue - totalCostStock;
                 const gainLossPercent = (gainLoss / totalCostStock) * 100;
 
+                const gfUrl = getGoogleFinanceUrl(stock.symbol, stock.exchange);
                 html += `
                     <tr>
-                        <td class="symbol">${displaySymbol}</td>
+                        <td class="symbol"><a href="${gfUrl}" target="_blank" class="symbol-link">${displaySymbol}</a></td>
                         <td class="number">${stock.quantity}</td>
                         <td class="number">€${purchasePriceEur.toFixed(2)}</td>
                         <td class="number">€${currentPriceEur.toFixed(2)}</td>
