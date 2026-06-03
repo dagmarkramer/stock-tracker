@@ -167,14 +167,35 @@
             color: #dc3545;
         }
 
-        .delete-btn {
-            background: #dc3545;
+        .edit-btn {
+            background: #28a745;
             padding: 6px 12px;
             font-size: 12px;
         }
 
+        .edit-btn:hover {
+            background: #218838;
+        }
+
+        .delete-btn {
+            background: #dc3545;
+            padding: 6px 12px;
+            font-size: 12px;
+            margin-left: 5px;
+        }
+
         .delete-btn:hover {
             background: #c82333;
+        }
+
+        .cancel-edit {
+            background: #6c757d;
+            padding: 10px 20px;
+            margin-left: 10px;
+        }
+
+        .cancel-edit:hover {
+            background: #5a6268;
         }
 
         .loading {
@@ -252,6 +273,10 @@
 
         <div id="summary" class="summary" style="display: none;"></div>
 
+        <div id="editingNotice" style="display: none; background: #cfe2ff; border: 1px solid #b6d4fe; padding: 10px; border-radius: 4px; margin-bottom: 20px; color: #084298;">
+            Editing stock - make your changes and click "Save Stock"
+        </div>
+
         <div class="add-stock-form">
             <div class="form-group">
                 <label for="symbol">Stock Symbol</label>
@@ -286,7 +311,8 @@
                 <label for="purchasePrice">Purchase Price</label>
                 <input type="number" id="purchasePrice" placeholder="e.g. 150.25" step="0.01" min="0">
             </div>
-            <button onclick="addStock()">Add Stock</button>
+            <button id="submitBtn" onclick="addStock()">Add Stock</button>
+            <button id="cancelBtn" class="cancel-edit" onclick="cancelEdit()" style="display: none;">Cancel</button>
         </div>
 
         <div class="table-container">
@@ -302,7 +328,7 @@
                         <th style="text-align: right;">1 Day</th>
                         <th style="text-align: right;">1 Week</th>
                         <th style="text-align: right;">All Time</th>
-                        <th style="text-align: center;">Action</th>
+                        <th style="text-align: center;">Actions</th>
                     </tr>
                 </thead>
                 <tbody id="stockList">
@@ -317,6 +343,14 @@
     <script>
         const STORAGE_KEY = 'stocks';
         const PRICE_CACHE_KEY = 'priceCache';
+        let editingStockId = null;
+
+        const DEFAULT_RATES = {
+            'EUR': 1,
+            'USD': 0.86,
+            'GBP': 1.27,
+            'CHF': 0.95
+        };
 
         function getApiKey() {
             return document.getElementById('apiKey').value;
@@ -343,49 +377,6 @@
             return `https://www.google.com/finance/quote/${fullSymbol}`;
         }
 
-        const DEFAULT_RATES = {
-            'EUR': 1,
-            'USD': 0.86,
-            'GBP': 1.27,
-            'CHF': 0.95
-        };
-
-        async function getExchangeRate(fromCurrency) {
-            if (fromCurrency === 'EUR') return 1;
-
-            const cache = getPriceCache();
-            const cacheKey = `rate_${fromCurrency}_EUR_${new Date().toDateString()}`;
-
-            if (cache[cacheKey]) {
-                return cache[cacheKey];
-            }
-
-            try {
-                const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), 3000);
-
-                const response = await fetch(
-                    `https://api.exchangerate-api.com/v4/latest/${fromCurrency}`,
-                    { signal: controller.signal }
-                );
-                clearTimeout(timeoutId);
-
-                const data = await response.json();
-
-                if (data.rates && data.rates.EUR) {
-                    const rate = data.rates.EUR;
-                    cache[cacheKey] = rate;
-                    savePriceCache(cache);
-                    return rate;
-                }
-                // Fallback to default rate
-                return DEFAULT_RATES[fromCurrency] || 1;
-            } catch (error) {
-                // Use default rate if API fails
-                return DEFAULT_RATES[fromCurrency] || 1;
-            }
-        }
-
         function addStock() {
             const symbol = document.getElementById('symbol').value.toUpperCase().trim();
             const exchange = document.getElementById('exchange').value;
@@ -399,30 +390,83 @@
             }
 
             const stocks = getStocks();
-            stocks.push({
-                id: Date.now(),
-                symbol,
-                exchange,
-                currency,
-                quantity,
-                purchasePrice,
-                addedDate: new Date().toISOString()
-            });
+
+            if (editingStockId) {
+                // Update existing stock
+                const index = stocks.findIndex(s => s.id === editingStockId);
+                if (index !== -1) {
+                    stocks[index] = {
+                        ...stocks[index],
+                        symbol,
+                        exchange,
+                        currency,
+                        quantity,
+                        purchasePrice
+                    };
+                }
+                cancelEdit();
+            } else {
+                // Add new stock
+                stocks.push({
+                    id: Date.now(),
+                    symbol,
+                    exchange,
+                    currency,
+                    quantity,
+                    purchasePrice,
+                    addedDate: new Date().toISOString()
+                });
+                document.getElementById('symbol').value = '';
+                document.getElementById('exchange').value = '';
+                document.getElementById('currency').value = 'EUR';
+                document.getElementById('quantity').value = '';
+                document.getElementById('purchasePrice').value = '';
+            }
 
             saveStocks(stocks);
+            renderStocks();
+        }
+
+        function editStock(id) {
+            const stocks = getStocks();
+            const stock = stocks.find(s => s.id === id);
+
+            if (stock) {
+                editingStockId = id;
+                document.getElementById('symbol').value = stock.symbol;
+                document.getElementById('exchange').value = stock.exchange || '';
+                document.getElementById('currency').value = stock.currency || 'EUR';
+                document.getElementById('quantity').value = stock.quantity;
+                document.getElementById('purchasePrice').value = stock.purchasePrice;
+
+                document.getElementById('submitBtn').textContent = 'Save Stock';
+                document.getElementById('cancelBtn').style.display = 'inline-block';
+                document.getElementById('editingNotice').style.display = 'block';
+
+                document.querySelector('.add-stock-form').scrollIntoView({ behavior: 'smooth' });
+            }
+        }
+
+        function cancelEdit() {
+            editingStockId = null;
             document.getElementById('symbol').value = '';
             document.getElementById('exchange').value = '';
             document.getElementById('currency').value = 'EUR';
             document.getElementById('quantity').value = '';
             document.getElementById('purchasePrice').value = '';
 
-            renderStocks();
+            document.getElementById('submitBtn').textContent = 'Add Stock';
+            document.getElementById('cancelBtn').style.display = 'none';
+            document.getElementById('editingNotice').style.display = 'none';
         }
 
         function deleteStock(id) {
             if (confirm('Delete this stock?')) {
                 const stocks = getStocks();
                 saveStocks(stocks.filter(s => s.id !== id));
+                if (editingStockId === id) {
+                    cancelEdit();
+                }
                 renderStocks();
             }
         }
@@ -481,6 +525,40 @@
             }
         }
 
+        async function getExchangeRate(fromCurrency) {
+            if (fromCurrency === 'EUR') return 1;
+
+            const cache = getPriceCache();
+            const cacheKey = `rate_${fromCurrency}_EUR_${new Date().toDateString()}`;
+
+            if (cache[cacheKey]) {
+                return cache[cacheKey];
+            }
+
+            try {
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 3000);
+
+                const response = await fetch(
+                    `https://api.exchangerate-api.com/v4/latest/${fromCurrency}`,
+                    { signal: controller.signal }
+                );
+                clearTimeout(timeoutId);
+
+                const data = await response.json();
+
+                if (data.rates && data.rates.EUR) {
+                    const rate = data.rates.EUR;
+                    cache[cacheKey] = rate;
+                    savePriceCache(cache);
+                    return rate;
+                }
+                return DEFAULT_RATES[fromCurrency] || 1;
+            } catch (error) {
+                return DEFAULT_RATES[fromCurrency] || 1;
+            }
+        }
+
         async function renderStocks() {
             const stocks = getStocks();
             const tbody = document.getElementById('stockList');
@@ -511,7 +589,6 @@
                     continue;
                 }
 
-                // Get exchange rate for the stock's currency
                 const exchangeRate = await getExchangeRate(stock.currency);
                 if (!exchangeRate) {
                     html += `
@@ -525,7 +602,6 @@
                     continue;
                 }
 
-                // Convert prices to EUR
                 const purchasePriceEur = stock.purchasePrice * exchangeRate;
                 const currentPriceEur = priceData.price * exchangeRate;
                 const totalCostStock = stock.quantity * purchasePriceEur;
@@ -533,7 +609,7 @@
                 const allTimeChange = currentPriceEur - purchasePriceEur;
                 const allTimeChangePercent = (allTimeChange / purchasePriceEur) * 100;
                 const dayChangePercent = priceData.changePercent;
-                const weekChangePercent = dayChangePercent * 5; // Rough estimate
+                const weekChangePercent = dayChangePercent * 5;
 
                 totalCost += totalCostStock;
                 totalValue += currentValue;
@@ -560,6 +636,7 @@
                             ${allTimeChangePercent >= 0 ? '+' : ''}${allTimeChangePercent.toFixed(2)}%
                         </td>
                         <td style="text-align: center;">
+                            <button class="edit-btn" onclick="editStock(${stock.id})">Edit</button>
                             <button class="delete-btn" onclick="deleteStock(${stock.id})">Delete</button>
                         </td>
                     </tr>
@@ -568,7 +645,6 @@
 
             tbody.innerHTML = html;
 
-            // Show summary
             const gainLoss = totalValue - totalCost;
             const gainLossPercent = (gainLoss / totalCost) * 100;
             const summary = document.getElementById('summary');
@@ -591,7 +667,6 @@
             summary.style.display = 'block';
         }
 
-        // Load on page load
         document.addEventListener('DOMContentLoaded', () => {
             const saved = localStorage.getItem('apiKey');
             if (saved) {
