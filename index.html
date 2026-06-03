@@ -239,6 +239,87 @@
             font-family: 'Monaco', 'Courier New', monospace;
         }
 
+        .search-container {
+            margin-bottom: 30px;
+            position: relative;
+        }
+
+        .search-input-group {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+
+        .search-input-group input {
+            flex: 1;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+
+        .search-input-group button {
+            padding: 10px 20px;
+        }
+
+        .search-results {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            max-height: 300px;
+            overflow-y: auto;
+            z-index: 100;
+            display: none;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+
+        .search-results.active {
+            display: block;
+        }
+
+        .search-result-item {
+            padding: 12px;
+            border-bottom: 1px solid #eee;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .search-result-item:last-child {
+            border-bottom: none;
+        }
+
+        .search-result-item:hover {
+            background: #f0f0f0;
+        }
+
+        .search-result-symbol {
+            font-weight: 600;
+            color: #007bff;
+            margin-bottom: 4px;
+        }
+
+        .search-result-name {
+            font-size: 13px;
+            color: #666;
+        }
+
+        .search-loading {
+            padding: 12px;
+            text-align: center;
+            color: #999;
+            font-style: italic;
+        }
+
+        .search-no-results {
+            padding: 12px;
+            text-align: center;
+            color: #999;
+        }
+
         @media (max-width: 768px) {
             .add-stock-form {
                 grid-template-columns: 1fr;
@@ -277,22 +358,18 @@
             Editing stock - make your changes and click "Save Stock"
         </div>
 
+        <div class="search-container">
+            <div class="search-input-group">
+                <input type="text" id="searchInput" placeholder="Search stocks by symbol or company name (e.g. AAPL, Apple, VUSA)">
+                <button onclick="searchStocks()">Search</button>
+            </div>
+            <div class="search-results" id="searchResults"></div>
+        </div>
+
         <div class="add-stock-form">
             <div class="form-group">
                 <label for="symbol">Stock Symbol</label>
-                <input type="text" id="symbol" placeholder="e.g. AAPL" style="text-transform: uppercase;">
-            </div>
-            <div class="form-group">
-                <label for="exchange">Exchange</label>
-                <select id="exchange">
-                    <option value="">None (US/NASDAQ/NYSE)</option>
-                    <option value=".EAM">Euronext Amsterdam (EAMS)</option>
-                    <option value=".L">London (LON)</option>
-                    <option value=".DE">Germany Xetra (XE)</option>
-                    <option value=".BSX">Tradegate (BSX)</option>
-                    <option value=".PA">France (Euronext)</option>
-                    <option value=".SW">Switzerland (SIX)</option>
-                </select>
+                <input type="text" id="symbol" placeholder="From search above or e.g. AAPL.L" style="text-transform: uppercase;">
             </div>
             <div class="form-group">
                 <label for="currency">Currency</label>
@@ -378,16 +455,20 @@
         }
 
         function addStock() {
-            const symbol = document.getElementById('symbol').value.toUpperCase().trim();
-            const exchange = document.getElementById('exchange').value;
+            const symbolInput = document.getElementById('symbol').value.toUpperCase().trim();
             const currency = document.getElementById('currency').value;
             const quantity = parseFloat(document.getElementById('quantity').value);
             const purchasePrice = parseFloat(document.getElementById('purchasePrice').value);
 
-            if (!symbol || !quantity || !purchasePrice) {
+            if (!symbolInput || !quantity || !purchasePrice) {
                 showError('Please fill in all fields');
                 return;
             }
+
+            // Parse symbol and exchange from input (e.g., "AAPL.L" -> symbol="AAPL", exchange=".L")
+            const parts = symbolInput.split('.');
+            const symbol = parts[0];
+            const exchange = parts.length > 1 ? '.' + parts.slice(1).join('.') : '';
 
             const stocks = getStocks();
 
@@ -417,7 +498,6 @@
                     addedDate: new Date().toISOString()
                 });
                 document.getElementById('symbol').value = '';
-                document.getElementById('exchange').value = '';
                 document.getElementById('currency').value = 'EUR';
                 document.getElementById('quantity').value = '';
                 document.getElementById('purchasePrice').value = '';
@@ -433,8 +513,8 @@
 
             if (stock) {
                 editingStockId = id;
-                document.getElementById('symbol').value = stock.symbol;
-                document.getElementById('exchange').value = stock.exchange || '';
+                const fullSymbol = stock.symbol + (stock.exchange || '');
+                document.getElementById('symbol').value = fullSymbol;
                 document.getElementById('currency').value = stock.currency || 'EUR';
                 document.getElementById('quantity').value = stock.quantity;
                 document.getElementById('purchasePrice').value = stock.purchasePrice;
@@ -450,7 +530,6 @@
         function cancelEdit() {
             editingStockId = null;
             document.getElementById('symbol').value = '';
-            document.getElementById('exchange').value = '';
             document.getElementById('currency').value = 'EUR';
             document.getElementById('quantity').value = '';
             document.getElementById('purchasePrice').value = '';
@@ -671,6 +750,63 @@
             summary.style.display = 'block';
         }
 
+        async function searchStocks() {
+            const query = document.getElementById('searchInput').value.trim();
+            const apiKey = getApiKey();
+
+            if (!query) {
+                showError('Please enter a stock symbol or company name');
+                return;
+            }
+
+            if (!apiKey) {
+                showError('Please enter your Alpha Vantage API key');
+                return;
+            }
+
+            const resultsDiv = document.getElementById('searchResults');
+            resultsDiv.innerHTML = '<div class="search-loading">Searching...</div>';
+            resultsDiv.classList.add('active');
+
+            try {
+                const response = await fetch(
+                    `https://www.alphavantage.co/query?function=SYMBOL_SEARCH&keywords=${encodeURIComponent(query)}&apikey=${apiKey}`
+                );
+                const data = await response.json();
+
+                if (data['bestMatches'] && data['bestMatches'].length > 0) {
+                    let html = '';
+                    for (const match of data['bestMatches'].slice(0, 10)) {
+                        const symbol = match['1. symbol'];
+                        const name = match['2. name'];
+                        const region = match['4. region'];
+                        html += `
+                            <div class="search-result-item" onclick="selectSearchResult('${symbol}', '${name}')">
+                                <div class="search-result-symbol">${symbol}</div>
+                                <div class="search-result-name">${name} (${region})</div>
+                            </div>
+                        `;
+                    }
+                    resultsDiv.innerHTML = html;
+                } else if (data['Note']) {
+                    resultsDiv.innerHTML = '<div class="search-loading">API rate limit reached. Please wait a minute.</div>';
+                } else {
+                    resultsDiv.innerHTML = '<div class="search-no-results">No results found</div>';
+                }
+            } catch (error) {
+                resultsDiv.innerHTML = '<div class="search-no-results">Error searching. Please try again.</div>';
+                showError(`Search error: ${error.message}`);
+            }
+        }
+
+        function selectSearchResult(symbol, name) {
+            document.getElementById('symbol').value = symbol;
+            document.getElementById('searchInput').value = '';
+            document.getElementById('searchResults').classList.remove('active');
+            document.getElementById('searchResults').innerHTML = '';
+            document.getElementById('symbol').focus();
+        }
+
         document.addEventListener('DOMContentLoaded', () => {
             const saved = localStorage.getItem('apiKey');
             if (saved) {
@@ -679,6 +815,18 @@
 
             document.getElementById('apiKey').addEventListener('change', () => {
                 localStorage.setItem('apiKey', document.getElementById('apiKey').value);
+            });
+
+            document.getElementById('searchInput').addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    searchStocks();
+                }
+            });
+
+            document.addEventListener('click', (e) => {
+                if (!e.target.closest('.search-container')) {
+                    document.getElementById('searchResults').classList.remove('active');
+                }
             });
 
             renderStocks();
