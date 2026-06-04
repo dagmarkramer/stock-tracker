@@ -586,7 +586,7 @@
                     let changePercent = parseFloat(data['Global Quote']['10. change percent']);
 
                     // London Stock Exchange returns prices in pence, convert to pounds
-                    if (exchange === '.L') {
+                    if (exchange === '.L' || exchange === '.LON') {
                         price = price / 100;
                         change = change / 100;
                     }
@@ -695,8 +695,12 @@
                     continue;
                 }
 
-                const purchasePriceEur = stock.purchasePrice * exchangeRate;
-                const currentPriceEur = priceData.price * exchangeRate;
+                // For LSE stocks, ensure prices are in same unit
+                let purchasePrice = stock.purchasePrice;
+                let currentPrice = priceData.price;
+
+                const purchasePriceEur = purchasePrice * exchangeRate;
+                const currentPriceEur = currentPrice * exchangeRate;
                 const totalCostStock = stock.quantity * purchasePriceEur;
                 const currentValue = stock.quantity * currentPriceEur;
                 const allTimeChange = currentPriceEur - purchasePriceEur;
