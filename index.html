@@ -764,6 +764,24 @@
             summary.style.display = 'block';
         }
 
+        function getExchangeSuffixFromRegion(region) {
+            const regionMap = {
+                'United Kingdom': '.LON',
+                'Netherlands': '.EAM',
+                'Germany': '.DE',
+                'France': '.PA',
+                'Switzerland': '.SW',
+                'United States': '',
+            };
+
+            for (const [key, suffix] of Object.entries(regionMap)) {
+                if (region.includes(key)) {
+                    return suffix;
+                }
+            }
+            return '';
+        }
+
         async function searchStocks() {
             const query = document.getElementById('searchInput').value.trim();
             const apiKey = getApiKey();
@@ -794,9 +812,11 @@
                         const symbol = match['1. symbol'];
                         const name = match['2. name'];
                         const region = match['4. region'];
+                        const suffix = getExchangeSuffixFromRegion(region);
+                        const fullSymbol = symbol + suffix;
                         html += `
-                            <div class="search-result-item" onclick="selectSearchResult('${symbol}', '${name}')">
-                                <div class="search-result-symbol">${symbol}</div>
+                            <div class="search-result-item" onclick="selectSearchResult('${fullSymbol}', '${name}')">
+                                <div class="search-result-symbol">${fullSymbol}</div>
                                 <div class="search-result-name">${name} (${region})</div>
                             </div>
                         `;
