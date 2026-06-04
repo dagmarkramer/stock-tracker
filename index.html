@@ -423,7 +423,7 @@
         let editingStockId = null;
 
         const DEFAULT_RATES = {
-            'EUR': 1,
+            'EUR': 1.00,
             'USD': 0.86,
             'GBP': 1.18,
             'CHF': 0.95
@@ -586,7 +586,8 @@
                     let changePercent = parseFloat(data['Global Quote']['10. change percent']);
 
                     // London Stock Exchange returns prices in pence, convert to pounds
-                    if (exchange === '.L' || exchange === '.LON') {
+                    const isLSE = exchange === '.L' || exchange.includes('LON') || exchange.includes('.L.');
+                    if (isLSE) {
                         price = price / 100;
                         change = change / 100;
                     }
@@ -813,7 +814,8 @@
                         const name = match['2. name'];
                         const region = match['4. region'];
                         const suffix = getExchangeSuffixFromRegion(region);
-                        const fullSymbol = symbol + suffix;
+                        // AV sometimes already includes the exchange suffix in the symbol
+                        const fullSymbol = (suffix && symbol.endsWith(suffix)) ? symbol : symbol + suffix;
                         html += `
                             <div class="search-result-item" onclick="selectSearchResult('${fullSymbol}', '${name}')">
                                 <div class="search-result-symbol">${fullSymbol}</div>
