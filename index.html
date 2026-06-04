@@ -662,6 +662,7 @@
             let html = '';
             let totalCost = 0;
             let totalValue = 0;
+            let totalWeekChange = 0;
 
             for (const stock of stocks) {
                 const priceData = await fetchStockPrice(stock.symbol, stock.exchange);
@@ -711,6 +712,7 @@
 
                 totalCost += totalCostStock;
                 totalValue += currentValue;
+                totalWeekChange += currentValue * (weekChangePercent / 100);
 
                 const gainLoss = currentValue - totalCostStock;
                 const gainLossPercent = (gainLoss / totalCostStock) * 100;
@@ -745,6 +747,7 @@
 
             const gainLoss = totalValue - totalCost;
             const gainLossPercent = (gainLoss / totalCost) * 100;
+            const weekChangePercent = (totalWeekChange / totalValue) * 100;
             const summary = document.getElementById('summary');
             summary.innerHTML = `
                 <div class="summary-row">
@@ -754,6 +757,12 @@
                 <div class="summary-row">
                     <span class="summary-label">Current Portfolio Value (EUR):</span>
                     <span class="summary-value">€${totalValue.toFixed(2)}</span>
+                </div>
+                <div class="summary-row">
+                    <span class="summary-label">1 Week Change (EUR):</span>
+                    <span class="summary-value ${totalWeekChange >= 0 ? 'positive' : 'negative'}">
+                        ${totalWeekChange >= 0 ? '+' : ''}€${totalWeekChange.toFixed(2)} (${weekChangePercent >= 0 ? '+' : ''}${weekChangePercent.toFixed(2)}%)
+                    </span>
                 </div>
                 <div class="summary-row">
                     <span class="summary-label">Total Gain/Loss (EUR):</span>
@@ -814,8 +823,7 @@
                         const name = match['2. name'];
                         const region = match['4. region'];
                         const suffix = getExchangeSuffixFromRegion(region);
-                        // AV sometimes already includes the exchange suffix in the symbol
-                        const fullSymbol = (suffix && symbol.endsWith(suffix)) ? symbol : symbol + suffix;
+                        const fullSymbol = symbol + suffix;
                         html += `
                             <div class="search-result-item" onclick="selectSearchResult('${fullSymbol}', '${name}')">
                                 <div class="search-result-symbol">${fullSymbol}</div>
