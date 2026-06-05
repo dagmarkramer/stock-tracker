@@ -450,8 +450,19 @@
         }
 
         function getGoogleFinanceUrl(symbol, exchange) {
-            const fullSymbol = symbol + (exchange || '');
-            return `https://www.google.com/finance/quote/${fullSymbol}`;
+            const exchangeMap = {
+                '.LON': 'LON',
+                '.L':   'LON',
+                '.DE':  'ETR',
+                '.PA':  'EPA',
+                '.EAM': 'AMS',
+                '.SW':  'SWX',
+            };
+            const gfExchange = exchangeMap[exchange];
+            if (gfExchange) {
+                return `https://www.google.com/finance/quote/${symbol}:${gfExchange}`;
+            }
+            return `https://www.google.com/finance/quote/${symbol}`;
         }
 
         function addStock() {
