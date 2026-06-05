@@ -462,7 +462,8 @@
             if (gfExchange) {
                 return `https://www.google.com/finance/quote/${symbol}:${gfExchange}`;
             }
-            return `https://www.google.com/finance/quote/${symbol}`;
+            // For US stocks or unknown exchanges, fall back to search
+            return `https://www.google.com/finance/search?q=${symbol}`;
         }
 
         function addStock() {
